@@ -1,6 +1,6 @@
 const fs = require('fs').promises // 文件模块
 const os = require('os')
-const openProgess = require('./utils/cluster')
+const openProgess = require('./src/utils/cluster')
 const util = require('util')
 const chalk = require('chalk') // 控制台模块
 const readline = require('readline'); // node 行流

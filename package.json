@@ -1,8 +1,11 @@
 {
   "name": "file-compase",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "src/index.js",
   "license": "MIT",
+  "bin": {
+    "fileCompase": "./bin/index.js"
+  },
   "scripts": {
     "start": "node src/index.js"
   },
