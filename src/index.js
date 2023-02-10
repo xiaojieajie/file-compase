@@ -15,13 +15,8 @@ const rl = readline.createInterface({
   output: process.stdout
 })
 
-// question promise封装
-const question = util.promisify(rl.question).bind(rl)
-
 // 获取cpu 核数
 const cpus = os.cpus().length
-
-
 
 // 在node环境中，输出不一样的颜色
 function chalkConsole({ color = 'green', str }) {
@@ -29,7 +24,7 @@ function chalkConsole({ color = 'green', str }) {
 }
 
 // 启动函数
-async function start(path) {
+function start(path) {
   try {
     const windowPathReg = /(?:\\\\[^\\]+|[a-zA-Z]:)((?:\\[^\\]+)+\\)?([^<>:]*)/
     // linux文件路径
