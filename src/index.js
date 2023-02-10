@@ -1,6 +1,8 @@
 const fs = require('fs').promises // 文件模块
 const util = require('util')
+const os = require('os')
 const chalk = require('chalk') // 控制台模块
+const child_process = require('child_process');
 const readline = require('readline'); // node 行流
 const path = require('path') 
 const tinify = require('tinify') // 压缩
@@ -16,47 +18,10 @@ const rl = readline.createInterface({
 // question promise封装
 const question = util.promisify(rl.question).bind(rl)
 
+// 获取cpu 核数
+const cpus = os.cpus().length
 
 
-
-/**
- * 询问用户操作，如果用户回答是对的，则返回，否则继续询问
- * @param {readline.createInterface()} rl readline创建器返回的对象
- * @param {string} tipsMsg 询问用户的文字
- * @param {string} errMsg 用户输入错误提示的文字
- * @param {function} condition 条件 返回true满足，返回false不满足
- * @returns 用户输入信息
- */
-async function askingHandler({ rl, tipsMsg, errMsg, condition }) {
-  // rl.resume() // 重新询问
-  // 如果用户输入的正确，返回用户输入，否贼递归
-  const answer = await question(tipsMsg)
-  if (answer === 'exit') {
-    rl.close()
-    return false
-  }
-  if (condition(answer)) {
-    return answer
-  }
-  chalkConsole({ color: 'red', str: errMsg }) // 提示
-  return await askingHandler({ rl, tipsMsg, errMsg, condition })
-}
-
-/**
- * 获取用户输入
- * @param {*} rl 
- * @returns 
- */
-async function getUserQuestion(rl) {
-  const liunxPathReg = /^\/(\w+\/?)+$/
-  const windowPathReg = /(?:\\\\[^\\]+|[a-zA-Z]:)((?:\\[^\\]+)+\\)?([^<>:]*)/
-  return await askingHandler({
-    rl,
-    tipsMsg: '请输入路径(或输入exit退出)：',
-    errMsg: '请输入正确的路径, 或按 ctrl + c 退出命令',
-    condition: answer => answer && windowPathReg.test(answer) || liunxPathReg.test(answer)
-  })
-}
 
 // 在node环境中，输出不一样的颜色
 function chalkConsole({ color = 'green', str }) {
@@ -64,22 +29,22 @@ function chalkConsole({ color = 'green', str }) {
 }
 
 // 启动函数
-async function init() {
+async function start(path) {
   try {
-    const userPath = await getUserQuestion(rl) // 获取用户输入
-    if (!userPath) {
+    const windowPathReg = /(?:\\\\[^\\]+|[a-zA-Z]:)((?:\\[^\\]+)+\\)?([^<>:]*)/
+    // linux文件路径
+    const liunxPathReg =  /\/([\w\.]+\/?)*/;
+    if (!windowPathReg.test(path) && !liunxPathReg.test(path)) {
+      chalkConsole({ color: 'red', str: '请输入正确的路径' });
       rl.close()
       return
     }
-    // rl.pause()
-    comPressThePicture(userPath) // 压缩图片
+    comPressThePicture(path) // 压缩图片
   } catch (err) {
     console.log('我报错了', err)
   }
   
 }
-
-init()
 
 /**
  * 获取图片大小和单位
@@ -152,27 +117,35 @@ async function comPressThePicture(assetsPath) {
     result = await getFileDirectory(assetsPath)
   } catch (err) {
     // chalkConsole({ color: 'red', str: '请检查目录是否正确' })
-    await getUserQuestion(rl) // 重新询问用户
+    // await getUserQuestion(rl) // 重新询问用户
+    rl.close()
     return
   }
-
-  chalkConsole({ str: `共有${result.length}张图片` })
-  const ask = await askingHandler({ rl, tipsMsg: '是否要进行压缩，输入1开始压缩：', errMsg: '请输入1开启压缩，或使用ctrl+c ｜ exit退出程序', condition: answer => Number(answer) === 1 })
-  console.log(ask)
-  if (!ask) return
-  
-  await toCompress(result)
+  chalkConsole({ str: `共有${result.length}张图片, 开始压缩` })
+  const processNum = result.length > cpus ? cpus : result.length;
+  const optimalSolution = getOptimalSolution(result.length, processNum);
+  const resultSlice = optimalSolution.map((num) => (result.splice(0, num)));
+  let finishNum = 0
+  for (let i = 0; i < processNum; i++) {
+    child_process.exec('ls', async () => {
+      await toCompress(resultSlice[i], i + 1);
+      if (++finishNum === processNum) {
+        chalkConsole({ str: '压缩结束，感谢您的使用!' })
+        rl.close()
+      }
+    })
+  }
 }
 
-async function toCompress(result) {
+async function toCompress(result, child_process_num) {
   let curIndex = 1
   for (const file of result) {
     const prevSize = file.fileSize
-    chalkConsole({ str: `正在压缩第${curIndex}张[${file.name}]` })
+    chalkConsole({ str: `进程${child_process_num}正在压缩第${curIndex}张[${file.name}]` })
     try {
       const source = tinify.fromFile(file.path)
       await source.toFile(file.path) // 开始压缩图片
-      chalkConsole({ str: `第${curIndex}张压缩完成` })
+      chalkConsole({ str: `进程${child_process_num}第${curIndex}张压缩完成` })
       const { fileSize, unit } = await getSingleFileInfo(file.path)
       const reduction = fileSize > prevSize ? Math.floor(((prevSize * 1000 - fileSize) / (prevSize * 1000)) * 100) : Math.floor(((prevSize - fileSize) / prevSize) * 100)
       console.log(chalk.green.bold(`压缩前：${prevSize}${file.unit}，压缩后：${fileSize}${unit}, 减少了${reduction}%`))
@@ -181,6 +154,21 @@ async function toCompress(result) {
     }
     curIndex++
   }
-  chalkConsole({ str: '压缩结束，感谢您的使用!' })
   rl.close()
+}
+
+
+
+
+start('/Users/lilongjie/Desktop/self-project/file-compase/assets')
+
+
+function getOptimalSolution(num, length) {
+  const result = new Array(length).fill(Math.floor(num / length));
+  const remainder = num % length
+
+  for (let i = 0; i < remainder; i++) {
+    result[i]++
+  }
+  return result
 }
