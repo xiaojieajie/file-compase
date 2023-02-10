@@ -1,18 +1,9 @@
 #!/usr/bin/env node
+const startCompress = require('../src/index');
 
-const type = "666";
-
-function print(msg) {
-  process.stdout.write(msg + '\n')
+if (process.argv.length < 3) {
+  console.log('请输入图片路径');
+  process.exit();
 }
 
-function runoo() {
-  process.stdout.write(type + '\n');
-};
-
-if (process.argv.includes('-h')) {
-  print(process.argv)
-  print(`help ooo`)
-}
-
-runoo();
+startCompress(process.argv[2]);

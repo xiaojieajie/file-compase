@@ -157,12 +157,6 @@ async function toCompress(result, child_process_num) {
   rl.close()
 }
 
-
-
-
-start('/Users/lilongjie/Desktop/self-project/file-compase/assets')
-
-
 function getOptimalSolution(num, length) {
   const result = new Array(length).fill(Math.floor(num / length));
   const remainder = num % length
@@ -172,3 +166,7 @@ function getOptimalSolution(num, length) {
   }
   return result
 }
+
+
+
+module.exports = start;
